@@ -175,9 +175,9 @@ jobs:
         if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4.4.0
         with:
-          name: ${{ matrix.Product.ProductName }}.${{ env.Version }}.${{ matrix.arch }}.msi
+          name: ${{ matrix.Product.ProductName }}.${{ env.Version }}.arm.msi
           path: |
-            output\${{ matrix.Product.ProductName }}.${{ env.Version }}.${{ matrix.arch }}.msi
+            output\${{ matrix.Product.ProductName }}.${{ env.Version }}.arm.msi
 
       - name: Upload artifact to release (tag only)
         if: github.ref_type == 'tag'
