@@ -48,7 +48,7 @@ jobs:
 
     - name: Set VCPKG triplet based on arch
       run: |
-        if (${{ matrix.arch }} -eq 'arm64') {
+        if ('${{ matrix.arch }}' -eq 'arm64') {        
           echo "VCPKG_DEFAULT_TRIPLET=arm64-windows" >> $env:GITHUB_ENV
         } else {
           echo "VCPKG_DEFAULT_TRIPLET=x64-windows" >> $env:GITHUB_ENV
