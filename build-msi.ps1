@@ -34,7 +34,7 @@ $InstallerFile = {
     New-InstallerFile -Source "$ScriptRoot\msi\RunOnUninstall.ps1" -Id 'RunOnUninstall'
 }
 
-New-Installer -ProductName $ProductName -ProductId $ProductId -UpgradeCode $UpgradeCode -Platform $Platform -Version $Version -Content {
+New-Installer -ProductName $ProductName -ProductId $ProductId -UpgradeCode $UpgradeCode -Platform arm -Version $Version -Content {
     New-InstallerDirectory -PredefinedDirectory "LocalAppDataFolder" -Content {
         New-InstallerDirectory -DirectoryName "Programs" -Content {
             New-InstallerDirectory -DirectoryName $ProductName -Content $InstallerFile

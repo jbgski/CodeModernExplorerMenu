@@ -9,13 +9,13 @@ on:
     branches:
       - main
     paths-ignore:
-      - '**/*.md'
+      - "**/*.md"
   pull_request:
     branches:
       - main
 
 env:
-  GYP_MSVS_VERSION: '2022'
+  GYP_MSVS_VERSION: "2022"
   Version: ${{ github.ref_name || github.event.release.tag_name }}
 
 permissions: write-all
@@ -33,155 +33,158 @@ jobs:
           - arm64
         Product:
           - { ProductName: "Code Modern Explorer Menu", Variant: stable }
-          - { ProductName: "Code Insiders Modern Explorer Menu", Variant: insiders }
+          - {
+              ProductName: "Code Insiders Modern Explorer Menu",
+              Variant: insiders,
+            }
 
     steps:
-    - name: Install PSMSI module
-      run: Install-Module -Name PSMSI -Scope CurrentUser -Force
+      - name: Install PSMSI module
+        run: Install-Module -Name PSMSI -Scope CurrentUser -Force
 
-    - uses: actions/checkout@v4.1.7
-      with:
-        submodules: recursive
+      - uses: actions/checkout@v4.1.7
+        with:
+          submodules: recursive
 
-    - name: Install Python Setuptools package
-      run: python -m pip install --upgrade setuptools
+      - name: Install Python Setuptools package
+        run: python -m pip install --upgrade setuptools
 
-    - name: Set VCPKG triplet based on arch
-      run: |
-        if ('${{ matrix.arch }}' -eq 'arm64') {        
-          echo "VCPKG_DEFAULT_TRIPLET=arm64-windows" >> $env:GITHUB_ENV
-        } else {
-          echo "VCPKG_DEFAULT_TRIPLET=x64-windows" >> $env:GITHUB_ENV
-        }
+      - name: Set VCPKG triplet based on arch
+        run: |
+          if ('${{ matrix.arch }}' -eq 'arm64') {        
+            echo "VCPKG_DEFAULT_TRIPLET=arm64-windows" >> $env:GITHUB_ENV
+          } else {
+            echo "VCPKG_DEFAULT_TRIPLET=x64-windows" >> $env:GITHUB_ENV
+          }
 
-    - name: vcpkg integrate install
-      run: vcpkg integrate install
+      - name: vcpkg integrate install
+        run: vcpkg integrate install
 
-    - name: Generate project solution
-      run: |
-        python gyp_library.py ${{ matrix.arch }}
-        # show out/ contents so CI failure gives immediate context if generation failed
-        if (Test-Path out) {
-          Write-Host "Contents of out/ after generation:"
-          Get-ChildItem -Path out -Recurse -Force | ForEach-Object { Write-Host $_.FullName }
-        } else {
-          Write-Host "out/ directory not found after generation."
-        }
+      - name: Generate project solution
+        run: |
+          python gyp_library.py ${{ matrix.arch }}
+          # show out/ contents so CI failure gives immediate context if generation failed
+          if (Test-Path out) {
+            Write-Host "Contents of out/ after generation:"
+            Get-ChildItem -Path out -Recurse -Force | ForEach-Object { Write-Host $_.FullName }
+          } else {
+            Write-Host "out/ directory not found after generation."
+          }
 
-    - name: Verify generated solution exists
-      run: |
-        if (-not (Test-Path out\main.sln)) {
-          Write-Host "ERROR: expected out\main.sln missing. Listing repository root:"
-          Get-ChildItem -Path . -Recurse -Force | ForEach-Object { Write-Host $_.FullName }
-          exit 1
-        } else {
-          Write-Host "Found out\main.sln"
-        }
+      - name: Verify generated solution exists
+        run: |
+          if (-not (Test-Path out\main.sln)) {
+            Write-Host "ERROR: expected out\main.sln missing. Listing repository root:"
+            Get-ChildItem -Path . -Recurse -Force | ForEach-Object { Write-Host $_.FullName }
+            exit 1
+          } else {
+            Write-Host "Found out\main.sln"
+          }
 
-    - name: Log contents of solution file
-      run: |
-        if (Test-Path out\main.sln) {
-          Write-Host "===== BEGIN main.sln ====="
-          Get-Content out\main.sln | ForEach-Object { Write-Host $_ }
-          Write-Host "===== END main.sln ====="
-        } else {
-          Write-Host "main.sln not found, cannot log contents."
-        }
+      - name: Log contents of solution file
+        run: |
+          if (Test-Path out\main.sln) {
+            Write-Host "===== BEGIN main.sln ====="
+            Get-Content out\main.sln | ForEach-Object { Write-Host $_ }
+            Write-Host "===== END main.sln ====="
+          } else {
+            Write-Host "main.sln not found, cannot log contents."
+          }
 
-    - name: Locate Visual Studio with vswhere and set paths
-      shell: pwsh
-      run: |
-        $vswhere = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe'
-        if (-not (Test-Path $vswhere)) {
-          Write-Error "vswhere.exe not found at expected path: $vswhere"
-          exit 1
-        }
-        $vsPath = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
-        if (-not $vsPath) {
-          Write-Error "Visual Studio with MSBuild not found"
-          exit 1
-        }
-        Write-Host "Visual Studio installationPath: $vsPath"
-        echo "VS_INSTALL_PATH=$vsPath" >> $env:GITHUB_ENV
+      - name: Locate Visual Studio with vswhere and set paths
+        shell: pwsh
+        run: |
+          $vswhere = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe'
+          if (-not (Test-Path $vswhere)) {
+            Write-Error "vswhere.exe not found at expected path: $vswhere"
+            exit 1
+          }
+          $vsPath = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
+          if (-not $vsPath) {
+            Write-Error "Visual Studio with MSBuild not found"
+            exit 1
+          }
+          Write-Host "Visual Studio installationPath: $vsPath"
+          echo "VS_INSTALL_PATH=$vsPath" >> $env:GITHUB_ENV
 
-    - name: Build project solution using VsDevCmd for target arch
-      working-directory: out
-      shell: pwsh
-      run: |
-        $vsPath = $env:VS_INSTALL_PATH
-        $vsDevCmd = Join-Path $vsPath 'Common7\Tools\VsDevCmd.bat'
-        if (-not (Test-Path $vsDevCmd)) {
-          Write-Error "VsDevCmd.bat not found under $vsPath"
-          exit 1
-        }
+      - name: Build project solution using VsDevCmd for target arch
+        working-directory: out
+        shell: pwsh
+        run: |
+          $vsPath = $env:VS_INSTALL_PATH
+          $vsDevCmd = Join-Path $vsPath 'Common7\Tools\VsDevCmd.bat'
+          if (-not (Test-Path $vsDevCmd)) {
+            Write-Error "VsDevCmd.bat not found under $vsPath"
+            exit 1
+          }
 
-        if ('${{ matrix.arch }}' -eq 'arm64') {
-          $archArg = '-arch=arm64'
-        } else {
-          $archArg = '-arch=x64'
-        }
+          if ('${{ matrix.arch }}' -eq 'arm64') {
+            $archArg = '-arch=arm64'
+          } else {
+            $archArg = '-arch=x64'
+          }
 
-        # Ensure the generated solution exists in the current working directory (out)
-        if (-not (Test-Path 'main.sln')) {
-          Write-Host "Failed to find main.sln in $(Get-Location). Listing contents:"
-          Get-ChildItem -Force -Recurse | ForEach-Object { Write-Host $_.FullName }
-          Write-Error "main.sln not found. Confirm gyp_library.py generated the solution into the out/ directory."
-          exit 1
-        }
+          # Ensure the generated solution exists in the current working directory (out)
+          if (-not (Test-Path 'main.sln')) {
+            Write-Host "Failed to find main.sln in $(Get-Location). Listing contents:"
+            Get-ChildItem -Force -Recurse | ForEach-Object { Write-Host $_.FullName }
+            Write-Error "main.sln not found. Confirm gyp_library.py generated the solution into the out/ directory."
+            exit 1
+          }
 
-        # Run VsDevCmd then MSBuild in same cmd session. Use relative path main.sln because working-directory is out.
-        $msbuildCmd = "cmd /c `"$vsDevCmd`" $archArg -no_logo && msbuild main.sln /m /p:VcpkgEnableManifest=true /p:Platform=${{ matrix.arch }} /p:Configuration=Default"
-        Write-Host "Running: $msbuildCmd"
-        & cmd /c "`"$vsDevCmd`" $archArg -no_logo && msbuild main.sln /m /p:VcpkgEnableManifest=true /p:Platform=${{ matrix.arch }} /p:Configuration=Default"
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Run VsDevCmd then MSBuild in same cmd session. Use relative path main.sln because working-directory is out.
+          $msbuildCmd = "cmd /c `"$vsDevCmd`" $archArg -no_logo && msbuild main.sln /m /p:VcpkgEnableManifest=true /p:Platform=${{ matrix.arch }} /p:Configuration=Default"
+          Write-Host "Running: $msbuildCmd"
+          & cmd /c "`"$vsDevCmd`" $archArg -no_logo && msbuild main.sln /m /p:VcpkgEnableManifest=true /p:Platform=${{ matrix.arch }} /p:Configuration=Default"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-    - name: Create sparse package
-      run: |
-        $makeappx = "C:\Program Files (x86)\Windows Kits\10\App Certification Kit\makeappx.exe"
-        python3 .\scripts\generate_pkg.py ${{ matrix.Product.Variant }} ${{ matrix.arch }} .\template\AppxManifest.xml
-        Set-Location out
-        & "$makeappx" pack /d "${{ matrix.Product.Variant }}_explorer_pkg_${{ matrix.arch }}" /p "${{ matrix.Product.ProductName }} ${{ matrix.arch }}.appx" /nv
+      - name: Create sparse package
+        run: |
+          $makeappx = "C:\Program Files (x86)\Windows Kits\10\App Certification Kit\makeappx.exe"
+          python3 .\scripts\generate_pkg.py ${{ matrix.Product.Variant }} ${{ matrix.arch }} .\template\AppxManifest.xml
+          Set-Location out
+          & "$makeappx" pack /d "${{ matrix.Product.Variant }}_explorer_pkg_${{ matrix.arch }}" /p "${{ matrix.Product.ProductName }} ${{ matrix.arch }}.appx" /nv
 
-    - name: Copy dll for artifact upload
-      run: |
-        Set-Location out
-        Copy-Item -LiteralPath "Default\${{ matrix.Product.ProductName }}.dll" -Destination "..\out"
+      - name: Copy dll for artifact upload
+        run: |
+          Set-Location out
+          Copy-Item -LiteralPath "Default\${{ matrix.Product.ProductName }}.dll" -Destination "..\out"
 
-    - name: Upload appx and dll artifact
-      uses: actions/upload-artifact@v4.4.0
-      with:
-        name: ${{ matrix.Product.ProductName }} ${{ matrix.arch }}
-        path: |
-          out\${{ matrix.Product.ProductName }} ${{ matrix.arch }}.appx
-          out\${{ matrix.Product.ProductName }}.dll
+      - name: Upload appx and dll artifact
+        uses: actions/upload-artifact@v4.4.0
+        with:
+          name: ${{ matrix.Product.ProductName }} ${{ matrix.arch }}
+          path: |
+            out\${{ matrix.Product.ProductName }} ${{ matrix.arch }}.appx
+            out\${{ matrix.Product.ProductName }}.dll
 
-    - name: Copy files for msi
-      run: |
-        New-Item -Path "$env:GITHUB_WORKSPACE\output" -ItemType Directory -Force
-        Copy-Item -LiteralPath "out\Default\${{ matrix.Product.ProductName }}.dll" -Destination "$env:GITHUB_WORKSPACE\output" -Force
-        Copy-Item -LiteralPath "out\${{ matrix.Product.Variant }}_explorer_pkg_${{ matrix.arch }}\AppxManifest.xml" -Destination "$env:GITHUB_WORKSPACE\output" -Force
+      - name: Copy files for msi
+        run: |
+          New-Item -Path "$env:GITHUB_WORKSPACE\output" -ItemType Directory -Force
+          Copy-Item -LiteralPath "out\Default\${{ matrix.Product.ProductName }}.dll" -Destination "$env:GITHUB_WORKSPACE\output" -Force
+          Copy-Item -LiteralPath "out\${{ matrix.Product.Variant }}_explorer_pkg_${{ matrix.arch }}\AppxManifest.xml" -Destination "$env:GITHUB_WORKSPACE\output" -Force
 
-    - name: Set Version for non-release run
-      if: github.ref_name == 'main'
-      run: echo "Version=4.0.0" >> $env:GITHUB_ENV
+      - name: Set Version for non-release run
+        if: github.ref_name == 'main'
+        run: echo "Version=4.0.0" >> $env:GITHUB_ENV
 
-    - name: Run build-msi.ps1 script
-      run: .\build-msi.ps1 -ProductName "${{ matrix.Product.ProductName }}" -Variant ${{ matrix.Product.Variant }} -Platform arm -Version ${{ env.Version }}
+      - name: Run build-msi.ps1 script
+        run: .\build-msi.ps1 -ProductName "${{ matrix.Product.ProductName }}" -Variant ${{ matrix.Product.Variant }} -Platform ${{ matrix.arch }} -Version ${{ env.Version }}
 
-    - name: Upload MSI artifact (main branch only)
-      if: github.ref_name == 'main'
-      uses: actions/upload-artifact@v4.4.0
-      with:
-        name: ${{ matrix.Product.ProductName }}.${{ env.Version }}.${{ matrix.arch }}.msi
-        path: |
-          output\${{ matrix.Product.ProductName }}.${{ env.Version }}.${{ matrix.arch }}.msi
+      - name: Upload MSI artifact (main branch only)
+        if: github.ref_name == 'main'
+        uses: actions/upload-artifact@v4.4.0
+        with:
+          name: ${{ matrix.Product.ProductName }}.${{ env.Version }}.${{ matrix.arch }}.msi
+          path: |
+            output\${{ matrix.Product.ProductName }}.${{ env.Version }}.${{ matrix.arch }}.msi
 
-    - name: Upload artifact to release (tag only)
-      if: github.ref_type == 'tag'
-      uses: svenstaro/upload-release-action@2.9.0
-      with:
-        repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: output\${{ matrix.Product.ProductName }}.${{ env.Version }}.${{ matrix.arch }}.msi
-        asset_name: ${{ matrix.Product.ProductName }}.${{ env.Version }}.${{ matrix.arch }}.msi
-        tag: ${{ github.ref_name || github.event.release.tag_name }}
-        overwrite: true
+      - name: Upload artifact to release (tag only)
+        if: github.ref_type == 'tag'
+        uses: svenstaro/upload-release-action@2.9.0
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: output\${{ matrix.Product.ProductName }}.${{ env.Version }}.${{ matrix.arch }}.msi
+          asset_name: ${{ matrix.Product.ProductName }}.${{ env.Version }}.${{ matrix.arch }}.msi
+          tag: ${{ github.ref_name || github.event.release.tag_name }}
+          overwrite: true
