@@ -78,6 +78,16 @@ jobs:
           Write-Host "Found out\main.sln"
         }
 
+    - name: Log contents of solution file
+      run: |
+        if (Test-Path out\main.sln) {
+          Write-Host "===== BEGIN main.sln ====="
+          Get-Content out\main.sln | ForEach-Object { Write-Host $_ }
+          Write-Host "===== END main.sln ====="
+        } else {
+          Write-Host "main.sln not found, cannot log contents."
+        }
+
     - name: Locate Visual Studio with vswhere and set paths
       shell: pwsh
       run: |
