@@ -164,7 +164,7 @@ jobs:
       with:
         name: ${{ matrix.Product.ProductName }}.${{ env.Version }}.${{ matrix.arch }}.msi
         path: |
-          output\${{ Product.ProductName }}.${{ env.Version }}.${{ matrix.arch }}.msi
+          output\${{ matrix.Product.ProductName }}.${{ env.Version }}.${{ matrix.arch }}.msi
 
     - name: Upload artifact to release (tag only)
       if: github.ref_type == 'tag'
