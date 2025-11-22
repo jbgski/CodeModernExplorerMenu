@@ -58,7 +58,25 @@ jobs:
       run: vcpkg integrate install
 
     - name: Generate project solution
-      run: python gyp_library.py ${{ matrix.arch }}
+      run: |
+        python gyp_library.py ${{ matrix.arch }}
+        # show out/ contents so CI failure gives immediate context if generation failed
+        if (Test-Path out) {
+          Write-Host "Contents of out/ after generation:"
+          Get-ChildItem -Path out -Recurse -Force | ForEach-Object { Write-Host $_.FullName }
+        } else {
+          Write-Host "out/ directory not found after generation."
+        }
+
+    - name: Verify generated solution exists
+      run: |
+        if (-not (Test-Path out\main.sln)) {
+          Write-Host "ERROR: expected out\main.sln missing. Listing repository root:"
+          Get-ChildItem -Path . -Recurse -Force | ForEach-Object { Write-Host $_.FullName }
+          exit 1
+        } else {
+          Write-Host "Found out\main.sln"
+        }
 
     - name: Locate Visual Studio with vswhere and set paths
       shell: pwsh
@@ -87,18 +105,24 @@ jobs:
           exit 1
         }
 
-        # Choose host/target if needed. For hosted runners use -arch=arm64 for target or -arch=x86/x64 as appropriate.
         if ('${{ matrix.arch }}' -eq 'arm64') {
           $archArg = '-arch=arm64'
         } else {
           $archArg = '-arch=x64'
         }
 
-        # Initialize the Visual Studio environment and run MSBuild inside that environment.
-        # Use cmd /c to run the batch file then msbuild in the same cmd session.
-        $msbuildCmd = "cmd /c `"$vsDevCmd`" $archArg -no_logo && msbuild out\main.sln /m /p:VcpkgEnableManifest=true /p:Platform=${{ matrix.arch }} /p:Configuration=Release"
+        # Ensure the generated solution exists in the current working directory (out)
+        if (-not (Test-Path 'main.sln')) {
+          Write-Host "Failed to find main.sln in $(Get-Location). Listing contents:"
+          Get-ChildItem -Force -Recurse | ForEach-Object { Write-Host $_.FullName }
+          Write-Error "main.sln not found. Confirm gyp_library.py generated the solution into the out/ directory."
+          exit 1
+        }
+
+        # Run VsDevCmd then MSBuild in same cmd session. Use relative path main.sln because working-directory is out.
+        $msbuildCmd = "cmd /c `"$vsDevCmd`" $archArg -no_logo && msbuild main.sln /m /p:VcpkgEnableManifest=true /p:Platform=${{ matrix.arch }} /p:Configuration=Release"
         Write-Host "Running: $msbuildCmd"
-        & cmd /c "`"$vsDevCmd`" $archArg -no_logo && msbuild out\main.sln /m /p:VcpkgEnableManifest=true /p:Platform=${{ matrix.arch }} /p:Configuration=Release"
+        & cmd /c "`"$vsDevCmd`" $archArg -no_logo && msbuild main.sln /m /p:VcpkgEnableManifest=true /p:Platform=${{ matrix.arch }} /p:Configuration=Release"
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     - name: Create sparse package
@@ -140,7 +164,7 @@ jobs:
       with:
         name: ${{ matrix.Product.ProductName }}.${{ env.Version }}.${{ matrix.arch }}.msi
         path: |
-          output\${{ matrix.Product.ProductName }}.${{ env.Version }}.${{ matrix.arch }}.msi
+          output\${{ Product.ProductName }}.${{ env.Version }}.${{ matrix.arch }}.msi
 
     - name: Upload artifact to release (tag only)
       if: github.ref_type == 'tag'
