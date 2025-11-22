@@ -130,9 +130,9 @@ jobs:
         }
 
         # Run VsDevCmd then MSBuild in same cmd session. Use relative path main.sln because working-directory is out.
-        $msbuildCmd = "cmd /c `"$vsDevCmd`" $archArg -no_logo && msbuild main.sln /m /p:VcpkgEnableManifest=true /p:Platform=${{ matrix.arch }} /p:Configuration=Release"
+        $msbuildCmd = "cmd /c `"$vsDevCmd`" $archArg -no_logo && msbuild main.sln /m /p:VcpkgEnableManifest=true /p:Platform=${{ matrix.arch }} /p:Configuration=Default"
         Write-Host "Running: $msbuildCmd"
-        & cmd /c "`"$vsDevCmd`" $archArg -no_logo && msbuild main.sln /m /p:VcpkgEnableManifest=true /p:Platform=${{ matrix.arch }} /p:Configuration=Release"
+        & cmd /c "`"$vsDevCmd`" $archArg -no_logo && msbuild main.sln /m /p:VcpkgEnableManifest=true /p:Platform=${{ matrix.arch }} /p:Configuration=Default"
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     - name: Create sparse package
