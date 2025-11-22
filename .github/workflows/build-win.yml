@@ -29,7 +29,7 @@ jobs:
     strategy:
       matrix:
         arch:
-          - x64
+          #- x64
           - arm64
         Product:
           - { ProductName: "Code Modern Explorer Menu", Variant: stable }
@@ -166,7 +166,7 @@ jobs:
       run: echo "Version=4.0.0" >> $env:GITHUB_ENV
 
     - name: Run build-msi.ps1 script
-      run: .\build-msi.ps1 -ProductName "${{ matrix.Product.ProductName }}" -Variant ${{ matrix.Product.Variant }} -Platform ${{ matrix.arch }} -Version ${{ env.Version }}
+      run: .\build-msi.ps1 -ProductName "${{ matrix.Product.ProductName }}" -Variant ${{ matrix.Product.Variant }} -Platform arm -Version ${{ env.Version }}
 
     - name: Upload MSI artifact (main branch only)
       if: github.ref_name == 'main'
