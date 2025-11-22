@@ -168,6 +168,32 @@ jobs:
         if: github.ref_name == 'main'
         run: echo "Version=4.0.0" >> $env:GITHUB_ENV
 
+      - name: Setup PowerShell
+        shell: pwsh
+        run: |
+          $ScriptRoot = "$(Get-Location)"
+          $OutputDirectory = "$ScriptRoot/output"
+
+          # Clean output directory
+          if (Test-Path $OutputDirectory) {
+            Remove-Item -Path $OutputDirectory -Force -Recurse
+          }
+          New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
+
+          # Copy build artifacts (adjust paths as needed)
+          Copy-Item "$ScriptRoot\out\*" $OutputDirectory -Recurse -Force
+
+          # Create ZIP instead of MSI
+          $ZipPath = "$ScriptRoot\package.zip"
+          if (Test-Path $ZipPath) { Remove-Item $ZipPath -Force }
+          Compress-Archive -Path "$OutputDirectory\*" -DestinationPath $ZipPath
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-package
+          path: package.zip
+
       - name: Run build-msi.ps1 script
         run: .\build-msi.ps1 -ProductName "${{ matrix.Product.ProductName }}" -Variant ${{ matrix.Product.Variant }} -Platform ${{ matrix.arch }} -Version ${{ env.Version }}
 
