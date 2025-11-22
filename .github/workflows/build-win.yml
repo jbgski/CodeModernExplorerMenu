@@ -1,4 +1,5 @@
 name: build-win
+
 on:
   workflow_dispatch:
   workflow_call:
@@ -6,19 +7,17 @@ on:
     types: [published]
   push:
     branches:
-    - main
+      - main
     paths-ignore:
       - '**/*.md'
-
   pull_request:
     branches:
-    - main
+      - main
 
 env:
-    VCPKG_DEFAULT_TRIPLET: x64-windows
-    GYP_MSVS_VERSION: '2022'
-    Version: ${{ github.ref_name || github.event.release.tag_name }}
-    
+  GYP_MSVS_VERSION: '2022'
+  Version: ${{ github.ref_name || github.event.release.tag_name }}
+
 permissions: write-all
 
 jobs:
@@ -27,17 +26,15 @@ jobs:
     defaults:
       run:
         shell: pwsh
-
     strategy:
       matrix:
         arch:
-        - x64
-        #- arm64
-        Product: [
-          { ProductName: Code Modern Explorer Menu, Variant: stable },
-          { ProductName: Code Insiders Modern Explorer Menu, Variant: insiders }
-        ]
-        
+          - x64
+          - arm64
+        Product:
+          - { ProductName: "Code Modern Explorer Menu", Variant: stable }
+          - { ProductName: "Code Insiders Modern Explorer Menu", Variant: insiders }
+
     steps:
     - name: Install PSMSI module
       run: Install-Module -Name PSMSI -Scope CurrentUser -Force
@@ -49,38 +46,74 @@ jobs:
     - name: Install Python Setuptools package
       run: python -m pip install --upgrade setuptools
 
-    - name: Setup MSBuild
-      uses: microsoft/setup-msbuild@v2
-      with:
-        msbuild-architecture: ${{ matrix.arch }}
-
-    - name: Generate project solution
-      run: python gyp_library.py ${{ matrix.arch }}
+    - name: Set VCPKG triplet based on arch
+      run: |
+        if (${{ matrix.arch }} -eq 'arm64') {
+          echo "VCPKG_DEFAULT_TRIPLET=arm64-windows" >> $env:GITHUB_ENV
+        } else {
+          echo "VCPKG_DEFAULT_TRIPLET=x64-windows" >> $env:GITHUB_ENV
+        }
 
     - name: vcpkg integrate install
       run: vcpkg integrate install
 
-    - name: Build project solution
+    - name: Generate project solution
+      run: python gyp_library.py ${{ matrix.arch }}
+
+    - name: Locate Visual Studio with vswhere and set paths
+      shell: pwsh
+      run: |
+        $vswhere = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe'
+        if (-not (Test-Path $vswhere)) {
+          Write-Error "vswhere.exe not found at expected path: $vswhere"
+          exit 1
+        }
+        $vsPath = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
+        if (-not $vsPath) {
+          Write-Error "Visual Studio with MSBuild not found"
+          exit 1
+        }
+        Write-Host "Visual Studio installationPath: $vsPath"
+        echo "VS_INSTALL_PATH=$vsPath" >> $env:GITHUB_ENV
+
+    - name: Build project solution using VsDevCmd for target arch
       working-directory: out
-      run: msbuild /m main.sln /p:VcpkgEnableManifest=true
+      shell: pwsh
+      run: |
+        $vsPath = $env:VS_INSTALL_PATH
+        $vsDevCmd = Join-Path $vsPath 'Common7\Tools\VsDevCmd.bat'
+        if (-not (Test-Path $vsDevCmd)) {
+          Write-Error "VsDevCmd.bat not found under $vsPath"
+          exit 1
+        }
+
+        # Choose host/target if needed. For hosted runners use -arch=arm64 for target or -arch=x86/x64 as appropriate.
+        if ('${{ matrix.arch }}' -eq 'arm64') {
+          $archArg = '-arch=arm64'
+        } else {
+          $archArg = '-arch=x64'
+        }
+
+        # Initialize the Visual Studio environment and run MSBuild inside that environment.
+        # Use cmd /c to run the batch file then msbuild in the same cmd session.
+        $msbuildCmd = "cmd /c `"$vsDevCmd`" $archArg -no_logo && msbuild out\main.sln /m /p:VcpkgEnableManifest=true /p:Platform=${{ matrix.arch }} /p:Configuration=Release"
+        Write-Host "Running: $msbuildCmd"
+        & cmd /c "`"$vsDevCmd`" $archArg -no_logo && msbuild out\main.sln /m /p:VcpkgEnableManifest=true /p:Platform=${{ matrix.arch }} /p:Configuration=Release"
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     - name: Create sparse package
       run: |
         $makeappx = "C:\Program Files (x86)\Windows Kits\10\App Certification Kit\makeappx.exe"
-        
         python3 .\scripts\generate_pkg.py ${{ matrix.Product.Variant }} ${{ matrix.arch }} .\template\AppxManifest.xml
-
         Set-Location out
-
         & "$makeappx" pack /d "${{ matrix.Product.Variant }}_explorer_pkg_${{ matrix.arch }}" /p "${{ matrix.Product.ProductName }} ${{ matrix.arch }}.appx" /nv
 
     - name: Copy dll for artifact upload
       run: |
         Set-Location out
-
         Copy-Item -LiteralPath "Default\${{ matrix.Product.ProductName }}.dll" -Destination "..\out"
 
-    - name: Upload artifact
+    - name: Upload appx and dll artifact
       uses: actions/upload-artifact@v4.4.0
       with:
         name: ${{ matrix.Product.ProductName }} ${{ matrix.arch }}
@@ -90,12 +123,10 @@ jobs:
 
     - name: Copy files for msi
       run: |
-        New-Item -Name "$github_workspace\output" -ItemType Directory
+        New-Item -Path "$env:GITHUB_WORKSPACE\output" -ItemType Directory -Force
+        Copy-Item -LiteralPath "out\Default\${{ matrix.Product.ProductName }}.dll" -Destination "$env:GITHUB_WORKSPACE\output" -Force
+        Copy-Item -LiteralPath "out\${{ matrix.Product.Variant }}_explorer_pkg_${{ matrix.arch }}\AppxManifest.xml" -Destination "$env:GITHUB_WORKSPACE\output" -Force
 
-        Copy-Item -LiteralPath "out\Default\${{ matrix.Product.ProductName }}.dll" -Destination "$github_workspace\output"
-        
-        Copy-Item -LiteralPath "out\${{ matrix.Product.Variant }}_explorer_pkg_${{ matrix.arch }}\AppxManifest.xml" -Destination "$github_workspace\output"
-    
     - name: Set Version for non-release run
       if: github.ref_name == 'main'
       run: echo "Version=4.0.0" >> $env:GITHUB_ENV
@@ -103,17 +134,17 @@ jobs:
     - name: Run build-msi.ps1 script
       run: .\build-msi.ps1 -ProductName "${{ matrix.Product.ProductName }}" -Variant ${{ matrix.Product.Variant }} -Platform ${{ matrix.arch }} -Version ${{ env.Version }}
 
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4.4.0
+    - name: Upload MSI artifact (main branch only)
       if: github.ref_name == 'main'
+      uses: actions/upload-artifact@v4.4.0
       with:
         name: ${{ matrix.Product.ProductName }}.${{ env.Version }}.${{ matrix.arch }}.msi
         path: |
           output\${{ matrix.Product.ProductName }}.${{ env.Version }}.${{ matrix.arch }}.msi
 
-    - name: Upload artifact to release
-      uses: svenstaro/upload-release-action@2.9.0
+    - name: Upload artifact to release (tag only)
       if: github.ref_type == 'tag'
+      uses: svenstaro/upload-release-action@2.9.0
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
         file: output\${{ matrix.Product.ProductName }}.${{ env.Version }}.${{ matrix.arch }}.msi
