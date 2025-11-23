@@ -181,7 +181,7 @@ jobs:
           New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 
           # Copy build artifacts (adjust paths as needed)
-          Copy-Item "$ScriptRoot\out\*" $OutputDirectory -Recurse -Force
+          Copy-Item "$ScriptRoot\*" $OutputDirectory -Recurse -Force
 
           # Create ZIP instead of MSI
           $ZipPath = "$ScriptRoot\package_${{ matrix.Product.ProductName }}.zip"
@@ -191,7 +191,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-package-${{ github.run_number }}
+          name: build-package-${{ github.run_number }}-${{ matrix.Product.ProductName }}
           path: package_${{ matrix.Product.ProductName }}.zip
 
       - name: Run build-msi.ps1 script
