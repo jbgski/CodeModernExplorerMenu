@@ -168,7 +168,7 @@ jobs:
         if: github.ref_name == 'main'
         run: echo "Version=4.0.0" >> $env:GITHUB_ENV
 
-      - name: Setup PowerShell
+      - name: Create ZIP
         shell: pwsh
         run: |
           $ScriptRoot = "$(Get-Location)"
@@ -180,11 +180,17 @@ jobs:
           }
           New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 
-          # Copy build artifacts (adjust paths as needed)
-          Copy-Item "$ScriptRoot\*" $OutputDirectory -Recurse -Force
+          # Copy only the files that would normally go into the MSI
+          Copy-Item "$ScriptRoot\[Content_Types].xml" $OutputDirectory -Force
+          Copy-Item "$ScriptRoot\AppxBlockMap.xml" $OutputDirectory -Force
+          Copy-Item "$ScriptRoot\out\${{ matrix.Product.Variant }}_explorer_pkg_${{ matrix.arch }}\AppxManifest.xml" $OutputDirectory -Force
+          Copy-Item "$ScriptRoot\out\${{ matrix.Product.ProductName }} ${{ matrix.arch }}.appx" $OutputDirectory -Force
+          Copy-Item "$ScriptRoot\out\${{ matrix.Product.ProductName }}.dll" $OutputDirectory -Force
+          Copy-Item "$ScriptRoot\msi\RunOnInstall.ps1" $OutputDirectory -Force
+          Copy-Item "$ScriptRoot\msi\RunOnUninstall.ps1" $OutputDirectory -Force
 
           # Create ZIP instead of MSI
-          $ZipPath = "$ScriptRoot\package_${{ matrix.Product.ProductName }}.zip"
+          $ZipPath = "$ScriptRoot\package_${{ matrix.Product.ProductName }}_${{ matrix.arch }}.zip"
           if (Test-Path $ZipPath) { Remove-Item $ZipPath -Force }
           Compress-Archive -Path "$OutputDirectory\*" -DestinationPath $ZipPath
 
@@ -192,7 +198,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-package-${{ github.run_number }}-${{ matrix.Product.ProductName }}
-          path: package_${{ matrix.Product.ProductName }}.zip
+          path: package_${{ matrix.Product.ProductName }}_${{ matrix.arch }}.zip
 
       - name: Run build-msi.ps1 script
         run: .\build-msi.ps1 -ProductName "${{ matrix.Product.ProductName }}" -Variant ${{ matrix.Product.Variant }} -Platform ${{ matrix.arch }} -Version ${{ env.Version }}
