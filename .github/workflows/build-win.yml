@@ -184,15 +184,15 @@ jobs:
           Copy-Item "$ScriptRoot\out\*" $OutputDirectory -Recurse -Force
 
           # Create ZIP instead of MSI
-          $ZipPath = "$ScriptRoot\package.zip"
+          $ZipPath = "$ScriptRoot\package_${{ matrix.Product.ProductName }}.zip"
           if (Test-Path $ZipPath) { Remove-Item $ZipPath -Force }
           Compress-Archive -Path "$OutputDirectory\*" -DestinationPath $ZipPath
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-package
-          path: package.zip
+          name: build-package-${{ github.run_number }}
+          path: package__${{ matrix.Product.ProductName }}.zip
 
       - name: Run build-msi.ps1 script
         run: .\build-msi.ps1 -ProductName "${{ matrix.Product.ProductName }}" -Variant ${{ matrix.Product.Variant }} -Platform ${{ matrix.arch }} -Version ${{ env.Version }}
