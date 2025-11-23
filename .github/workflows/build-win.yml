@@ -192,7 +192,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-package-${{ github.run_number }}
-          path: package__${{ matrix.Product.ProductName }}.zip
+          path: package_${{ matrix.Product.ProductName }}.zip
 
       - name: Run build-msi.ps1 script
         run: .\build-msi.ps1 -ProductName "${{ matrix.Product.ProductName }}" -Variant ${{ matrix.Product.Variant }} -Platform ${{ matrix.arch }} -Version ${{ env.Version }}
